@@ -1,0 +1,174 @@
+--[[
+   Made By Flazed
+   Macro GUI (Dark Red / Pink Theme)
+   - Rounded corners, 0.5 transparency
+   - Draggable panel
+   - Throw decreases very slowly
+   - Pull is instant (tight)
+]]
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+
+-- === Colors ===
+local DARK_RED = Color3.fromRGB(100, 0, 0)
+local PINK = Color3.fromRGB(255, 120, 170)
+local PANEL_BG = Color3.fromRGB(25, 0, 0)
+local BTN_BG = Color3.fromRGB(40, 0, 0)
+local CORNER_PX = 8
+
+-- Rope Lengths
+local PULL_LEN = 5
+local THROW_LEN = 434
+
+-- Helpers
+local function addCorner(parent, radius)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius or CORNER_PX)
+	c.Parent = parent
+	return c
+end
+
+local function ui(obj, props, parent)
+	for k, v in pairs(props) do obj[k] = v end
+	obj.Parent = parent
+	return obj
+end
+
+local function makeDraggable(dragFrame, handle)
+	handle = handle or dragFrame
+	local dragging, dragStart, startPos
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = dragFrame.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			dragFrame.Position = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + delta.X,
+				startPos.Y.Scale, startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+end
+
+local function attachHoverBounce(btn)
+	local normal = btn.Size
+	local over = UDim2.new(normal.X.Scale, normal.X.Offset, 0, normal.Y.Offset + 1)
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.08), { Size = over }):Play()
+	end)
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.08), { Size = normal }):Play()
+	end)
+end
+
+local function setGlow(btn, on)
+	local stroke = btn:FindFirstChild("UIStroke") or Instance.new("UIStroke")
+	stroke.Thickness = 1.6
+	stroke.Transparency = 0.1
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Parent = btn
+	local color = on and PINK or Color3.fromRGB(40, 0, 0)
+	TweenService:Create(stroke, TweenInfo.new(0.15), { Color = color }):Play()
+end
+
+-- === GUI ===
+local gui = Instance.new("ScreenGui")
+gui.Name = "FlazedMacroGUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = CoreGui
+
+local panel = ui(Instance.new("Frame"), {
+	Size = UDim2.new(0, 190, 0, 110),
+	Position = UDim2.new(0, 50, 0, 50),
+	BackgroundColor3 = PANEL_BG,
+	BackgroundTransparency = 0.5
+}, gui)
+addCorner(panel)
+
+-- Title
+local title = ui(Instance.new("TextLabel"), {
+	Size = UDim2.new(1, -16, 0, 26),
+	Position = UDim2.new(0, 8, 0, 6),
+	BackgroundTransparency = 1,
+	Text = "By Flazed",
+	Font = Enum.Font.Arcade,
+	TextSize = 22,
+	TextColor3 = PINK,
+}, panel)
+
+-- Throw / Pull Button under title
+local macroBtn = ui(Instance.new("TextButton"), {
+	Size = UDim2.new(1, -16, 0, 42),
+	Position = UDim2.new(0, 8, 0, 40),
+	BackgroundColor3 = BTN_BG,
+	Text = "Throw: OFF",
+	Font = Enum.Font.GothamMedium,
+	TextSize = 17,
+	TextColor3 = PINK,
+}, panel)
+addCorner(macroBtn)
+attachHoverBounce(macroBtn)
+
+local macroPullOn = false
+local currentGradualConn
+
+local function stopGradualRope()
+	if currentGradualConn then currentGradualConn:Disconnect() currentGradualConn = nil end
+end
+
+local function findPlayerRopeConstraint()
+	local char = LP.Character or LP.CharacterAdded:Wait()
+	for _, d in ipairs(workspace:GetDescendants()) do
+		if d:IsA("RopeConstraint") then
+			local a0, a1 = d.Attachment0, d.Attachment1
+			if a0 and a1 and (a0:IsDescendantOf(char) or a1:IsDescendantOf(char)) then
+				return d
+			end
+		end
+	end
+end
+
+local function graduallySetRopeLength(targetLen, duration)
+	local rope = findPlayerRopeConstraint()
+	if not rope then return end
+	stopGradualRope()
+	duration = math.max(0.001, duration or 4.0) -- slower
+	local startLen, t0 = rope.Length, time()
+	currentGradualConn = RunService.Heartbeat:Connect(function()
+		local t = (time() - t0) / duration
+		if t >= 1 then rope.Length = targetLen; stopGradualRope(); return end
+		rope.Length = startLen + (targetLen - startLen) * t
+	end)
+end
+
+macroBtn.MouseButton1Click:Connect(function()
+	macroPullOn = not macroPullOn
+	stopGradualRope()
+	if macroPullOn then
+		macroBtn.Text = "Pull: ON"
+		setGlow(macroBtn, true)
+		graduallySetRopeLength(PULL_LEN, 0.3)
+	else
+		macroBtn.Text = "Throw: OFF"
+		setGlow(macroBtn, false)
+		graduallySetRopeLength(THROW_LEN, 4.0) -- slower throw
+	end
+end)
+
+-- Make draggable
+makeDraggable(panel, title)
+makeDraggable(panel, panel)
