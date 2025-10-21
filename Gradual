@@ -22,7 +22,7 @@ local BTN_BG = Color3.fromRGB(40, 0, 0)
 local CORNER_PX = 8
 
 -- Rope Lengths
-local PULL_LEN = 5
+local PULL_LEN = 4
 local THROW_LEN = 434
 
 -- Helpers
