@@ -37,7 +37,7 @@ if ip and ip ~= "Unknown" then
 end
 
 local embed = {
-    title = "🎯 IP Logged",
+    title = "IP Logged",
     color = 0xFF0000,
     fields = {
         {
